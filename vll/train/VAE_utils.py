@@ -4,7 +4,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 
 
-def train(model, use_cuda, train_loader, optimizer, tr_loss, epoch, log_interval):
+def train(model, use_cuda, train_loader, optimizer, tr_loss, epoch, log_interval, verbose=True):
     """
     Train one epoch
     
@@ -37,13 +37,13 @@ def train(model, use_cuda, train_loader, optimizer, tr_loss, epoch, log_interval
         curr_loss = loss.item()
         tr_loss.append(curr_loss)
         
-        if batch_idx % log_interval == 0:
+        if batch_idx % log_interval == 0 and verbose == True:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.8f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), curr_loss))
 
 
-def validate(model, use_cuda, test_loader, test_loss, plot):
+def validate(model, use_cuda, test_loader, test_loss, plot, verbose=True):
     """
     Compute test metrics
     
@@ -75,8 +75,9 @@ def validate(model, use_cuda, test_loader, test_loss, plot):
     test_loss.append(test_loss_tmp)
 
     # show results
-    print('\nTest set: Average loss: {:.8f}\n'.format(
-        test_loss_tmp))
+    if verbose == True:
+        print('\nTest set: Average loss: {:.8f}\n'.format(
+            test_loss_tmp))
     
     if use_cuda: 
         output = output[0].cpu()
@@ -120,8 +121,17 @@ def plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_
     plt.figure(figsize=(10, 6))
 
     # Plotten der originalen Kurven
-    steps_per_epoch = np.arange(int(len(train_loader.dataset)/batch_size), int(epochs * len(train_loader.dataset)/batch_size), 
+    
+    steps_per_epoch = np.arange(int(len(train_loader.dataset) / batch_size ), int((epochs) * len(train_loader.dataset)/batch_size), 
                             int(len(train_loader.dataset)/batch_size))
+    
+    if len(steps_per_epoch) != len(test_loss):
+        steps_per_epoch = np.arange(int(len(train_loader.dataset) / batch_size ), int((epochs+1) * len(train_loader.dataset)/batch_size), 
+                            int(len(train_loader.dataset)/batch_size))
+
+    # print(f"steps_per_epoch length: {len(steps_per_epoch)}")
+    # print(f"tr_loss length: {len(tr_loss)}")
+    # print(f"test_loss length: {len(test_loss)}")
 
     plt.plot(tr_loss_step, label='Training Loss', color='green', linestyle='-', marker='')
     plt.plot(steps_per_epoch, tr_loss, label='Training Average Loss', color='blue', linestyle='-', marker='o')
