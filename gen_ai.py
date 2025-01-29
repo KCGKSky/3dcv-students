@@ -21,14 +21,14 @@ model_type = 'VAE'
 
 # If the model should only run the health checks and not train
 check_health = False
-verbose = False
-plot_progress = True
+verbose = True
+plot_progress = False
 
 epoches = 3
 learning_rate = 0.01
 
 #log_interval * batchsize = how often the intermediate result is displayed
-batch_size = 300
+batch_size = 64
 log_interval = 10
 
 test_batch_size = 1000
