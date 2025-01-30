@@ -40,8 +40,6 @@ log_interval = 10
 
 test_batch_size = 1000
 
-
-
 # Activation Function === possible values : 'leakyrelu', 'sigmoid', 'tanh', 'silu'
 activation_func = 'sigmoid'
 # LeakyReLU leak value
@@ -70,7 +68,7 @@ while(1):
 
 
 
-# ========================= PARAMETERS ==============================
+# ========================= PARAMETERS END ==============================
 
 # use GPU if available
 use_cuda = torch.cuda.is_available()
