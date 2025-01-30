@@ -1,7 +1,0 @@
-Parameter,Value
-Model,VAE
-Epoches,50
-Batch Size,300
-Test Batch Size,1000
-Learning Rate,0.01
-ReLU Leak,0

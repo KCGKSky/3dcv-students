@@ -43,7 +43,7 @@ def train(model, use_cuda, train_loader, optimizer, tr_loss, epoch, log_interval
                 100. * batch_idx / len(train_loader), curr_loss))
 
 
-def validate(model, use_cuda, test_loader, test_loss, plot, save_plot_fullpath=None, verbose=True):
+def validate(model, use_cuda, test_loader, test_loss, plot, verbose=True):
     """
     Compute test metrics
     
@@ -100,9 +100,6 @@ def validate(model, use_cuda, test_loader, test_loss, plot, save_plot_fullpath=N
                 axes[i, j + tmp_idx].imshow(output[i * 5 + j].squeeze().detach().numpy(), cmap='gray')
                 axes[i, j + tmp_idx].axis('off')
                 axes[i, j + tmp_idx].set_title(f'Recon: {target[i * 5 + j].item()}')
-
-        if save_plot_fullpath != None:
-            plt.savefig(save_plot_fullpath, format='png', dpi=420)
         plt.show()
 
 
