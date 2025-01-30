@@ -21,34 +21,38 @@ from typing import List, Optional
 # ========================= PARAMETERS ==============================
 # The model to be used.  Possible values: 'AE' , 'VAE'
 model_type = 'VAE'
-layer_dimensions = [100, 200, 300, 256]
+layer_dimensions = [32, 64, 128, 256]
 latent_dimension = 2
 
 # If the model should only run the health checks and not train
 check_health = False
 verbose = True
-write_to_disk = False
-plot_progress = False
-plot_interval = 10
+# ================= SAVE TO DISK ================
 
-epoches = 2
-learning_rate = 0.01
+write_to_disk = True
+
+# ================= SAVE TO DISK ================
+plot_progress = False
+plot_interval = 15
+
+epoches = 100
+learning_rate = 0.2
 
 #log_interval * batchsize = how often the intermediate result is displayed
-batch_size = 400
-log_interval = 10
+batch_size = 32
+log_interval = 100
 
 test_batch_size = 1000
 
 # Activation Function === possible values : 'leakyrelu', 'sigmoid', 'tanh', 'silu'
-activation_func = 'sigmoid'
+activation_func = 'leakyrelu'
 # LeakyReLU leak value
 leak = 0
 
 # Loss Function
 kl_loss_weight = 0.5
-l1_loss_weight = 0.2
-mse_loss_weight = 0.6
+l1_loss_weight = 0.0
+mse_loss_weight = 0.5
 
 if write_to_disk == True:
     root_directory = '/home/student/Documents/IWR-CVL/3dcv-students/gen_ai-Models/Version-%d/'
@@ -63,7 +67,7 @@ while(1):
         print("Directory", root_directory, ' has been created.')
         break
     except FileExistsError:
-        print("ERROR: Directory", root_directory, ' already exists.', i)
+        print("WARNING: Directory", root_directory % i, ' already exists.')
         i = i + 1
 
 
@@ -93,6 +97,8 @@ test_loader = torch.utils.data.DataLoader(
 print('RUNNING CUDA' if use_cuda else 'RUNNING CPU')
 print('=== PARAMETERS ===')
 print('Model: ', model_type)
+print('Layer Dimensions:', layer_dimensions)
+print('Latent Dimensions:', latent_dimension)
 print('Epoches: ', epoches)
 print('Batch Size: ', batch_size)
 print('Learning Rate: ', learning_rate)
@@ -137,11 +143,17 @@ start_time = time.time()
 
 parameters = []
 parameters.append(['Model', model_type])
+list_layer_dimensions = str(layer_dimensions[0])
+for i in range(len(layer_dimensions) - 1):
+    list_layer_dimensions = list_layer_dimensions + ':' + str(layer_dimensions[i + 1])
+parameters.append(['Layers, En/Decoder mirrored', list_layer_dimensions])
+parameters.append(['Latent Layer Dimension', latent_dimension])
 parameters.append(['Epoches', epoches])
 parameters.append(['Batch Size', batch_size])
 parameters.append(['Test Batch Size', test_batch_size])
 parameters.append(['Learning Rate', learning_rate])
-parameters.append(['ReLU Leak', leak])
+parameters.append(['Activation Function', activation_func])
+if activation_func == 'leakyrelu': parameters.append(['ReLU Leak', leak])
 parameters.append(['KL Loss Weight', kl_loss_weight])
 parameters.append(['L1 Loss Weight', l1_loss_weight])
 parameters.append(['MSE Loss Weight', mse_loss_weight])
@@ -595,6 +607,9 @@ if model_type == 'AE' and check_health == False:
         train_loss_tmp = []
         train(model=AE_model, use_cuda=use_cuda, train_loader=train_loader, optimizer=optimizer,
             epoch=epoch, log_interval=log_interval, tr_loss=train_loss_tmp, verbose=verbose)
+        
+        print('EPOCHE: ', epoch, '=== Elapsed time: ', time.time() - start_time, 'seconds')
+
         for i in range(len(train_loss_tmp)):
             tr_loss_step.append(train_loss_tmp[i])
         tr_loss.append(np.sum(train_loss_tmp).item() / len(train_loader.dataset))
@@ -642,7 +657,7 @@ if model_type == 'VAE' and check_health == False:
         train(model=VAE_model, use_cuda=use_cuda, train_loader=train_loader, optimizer=optimizer,
             epoch=epoch, log_interval=log_interval, tr_loss=train_loss_tmp, verbose=verbose)
         
-        print('EPOCHE: ', epoch)
+        print('EPOCHE: ', epoch, '=== Elapsed time: ', time.time() - start_time, 'seconds')
 
         for i in range(len(train_loss_tmp)):
             tr_loss_step.append(train_loss_tmp[i])
@@ -662,8 +677,7 @@ if model_type == 'VAE' and check_health == False:
     plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_size)
     validate(model=VAE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=True, save_plot_fullpath=root_directory+'generated.png', verbose=verbose)
 
-    if write_to_disk == True:
-        torch.save(VAE_model.state_dict(), root_directory+'pytorch_model_weights.pt')
+    torch.save(VAE_model.state_dict(), root_directory + 'pytorch_model_weights.pt')
 
 
 # =========================== VANILLA === LATENT SPACE VISUALIZATION =========================================

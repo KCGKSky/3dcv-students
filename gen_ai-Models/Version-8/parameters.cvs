@@ -1,0 +1,10 @@
+Parameter,Value
+Model,VAE
+Epoches,50
+Batch Size,400
+Test Batch Size,1000
+Learning Rate,0.01
+Activation Function,sigmoid
+KL Loss Weight,0.5
+L1 Loss Weight,0.2
+MSE Loss Weight,0.6
