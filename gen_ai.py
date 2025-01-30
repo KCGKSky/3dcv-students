@@ -42,8 +42,8 @@ test_batch_size = 1000
 
 
 
-# Activation Function ===  not implemented
-activation_func = 'relu'
+# Activation Function === possible values : 'leakyrelu', 'sigmoid', 'tanh', 'silu'
+activation_func = 'sigmoid'
 # LeakyReLU leak value
 leak = 0
 
@@ -98,11 +98,13 @@ print('Model: ', model_type)
 print('Epoches: ', epoches)
 print('Batch Size: ', batch_size)
 print('Learning Rate: ', learning_rate)
-print('ReLU Leak: ', leak)
+print('Activation Function: ', activation_func)
+if activation_func == 'leakyrelu': print('ReLU Leak: ', leak)
 print('Verbose: ', verbose)
 print('Plot Progress: ', plot_progress)
 print('Plot Interval: ', plot_interval)
 print('Only Check Health: ', check_health)
+print('Write to disk: ', write_to_disk)
 
 # ================== HELPER FUNCTIONS ==========================================
 #takes an array as the input and saves it at the specified path as a cvs file
@@ -172,6 +174,7 @@ class Vanilla_AE(nn.Module):
                  latent_dim: int,
                  input_size: np.ndarray,
                  hidden_dims: List = None,
+                 activation_function = None,
                  **kwargs) -> None:
     
         super(Vanilla_AE, self).__init__()
@@ -179,6 +182,7 @@ class Vanilla_AE(nn.Module):
         self.input_size = input_size
         self.latent_dim = latent_dim
         self.leak = leak
+        self.activ_func = activation_function
     
         modules = []
         if hidden_dims is None:
@@ -223,7 +227,18 @@ class Vanilla_AE(nn.Module):
         for i in range(len(self.layer_struct) - 1):
             self.structure.append(nn.Conv2d(self.layer_struct[i], self.layer_struct[i+1], 3, 2, 1))
             self.structure.append(nn.BatchNorm2d(self.layer_struct[i+1]))
-            self.structure.append(nn.LeakyReLU(self.leak))
+            # If statement to choose which activation function to use. if Input is invalid ReLU is used
+            if self.activ_func == 'leakyrelu':
+                self.structure.append(nn.LeakyReLU(self.leak))
+            elif self.activ_func == 'sigmoid':
+                self.structure.append(nn.Sigmoid())
+            elif self.activ_func == 'tanh':
+                self.structure.append(nn.Tanh())
+            elif self.activ_func == 'silu':
+                self.structure.append(nn.SiLU())
+            else:
+                print("Encoder -> Activationfunction -> Using default ReLU <- Invalid Activation function")
+                self.structure.append(nn.ReLU())
 
         #encode it all inside the nn.Sequential()
         #print(self.structure)
@@ -293,13 +308,24 @@ class Vanilla_AE(nn.Module):
 
         self.layer_struct.reverse()
         self.layer_struct.append(self.layer_struct[-1])
-        print(self.layer_struct)
+        #print(self.layer_struct)
 
         #create a loop that loops over all the layer info and appends it to the list
         for i in range(len(self.layer_struct) - 1):
             self.structure.append(nn.ConvTranspose2d(self.layer_struct[i], self.layer_struct[i+1], 3, 2, 1, 1))
             self.structure.append(nn.BatchNorm2d(self.layer_struct[i+1]))
-            self.structure.append(nn.LeakyReLU(self.leak))
+            # if statement to determine activation function
+            if self.activ_func == 'leakyrelu':
+                self.structure.append(nn.LeakyReLU(self.leak))
+            elif self.activ_func == 'sigmoid':
+                self.structure.append(nn.Sigmoid())
+            elif self.activ_func == 'tanh':
+                self.structure.append(nn.Tanh())
+            elif self.activ_func == 'silu':
+                self.structure.append(nn.SiLU())
+            else:
+                print("Decoder -> Activationfunction -> Using default ReLU <- Invalid Activation function")
+                self.structure.append(nn.ReLU())
 
         #encode it all inside the nn.Sequential()
         #print(self.structure)
@@ -401,8 +427,9 @@ class VAE(Vanilla_AE):
                  latent_dim: int,
                  input_size: np.ndarray,
                  hidden_dims: List = None,
+                 activation_function = None,
                  **kwargs) -> None:
-        super().__init__(in_channels, latent_dim, input_size, hidden_dims)
+        super().__init__(in_channels, latent_dim, input_size, hidden_dims, activation_function)
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -489,7 +516,7 @@ class VAE(Vanilla_AE):
 # Test your implementation
 # You should see the original MNIST images and 2 noisy images below (since the AE is not trained yet)
 if model_type == 'AE':
-    AE_model = Vanilla_AE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions)
+    AE_model = Vanilla_AE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions, activation_function=activation_func)
 
 if model_type == 'AE' and check_health == True:
     summary(AE_model, input_size=(1, 28, 28), device='cpu')
@@ -519,7 +546,7 @@ if model_type == 'AE' and check_health == True:
 # Test your implementation
 # You should see the original MNIST images and 2 noisy images below (since the AE is not trained yet)
 if model_type == 'VAE':
-    VAE_model = VAE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions)
+    VAE_model = VAE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions, activation_function=activation_func)
 
 if model_type == 'VAE' and check_health == True:
     summary(VAE_model, input_size=(1, 28, 28), device='cpu')
@@ -585,10 +612,10 @@ if model_type == 'AE' and check_health == False:
 
     arr2cvs_file('loss.cvs', training_loss, 2, 'Training Loss', 'Test Loss')
 
-    
-
     plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_size)
     validate(model=AE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=plot_progress, verbose=verbose)
+    if write_to_disk == True:
+        torch.save(AE_model.state_dict(), root_directory+'pytorch_model_weights.pt')
 
 
 # ========================== VARIATIONAL Training ================================================================
@@ -637,6 +664,8 @@ if model_type == 'VAE' and check_health == False:
     plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_size)
     validate(model=VAE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=True, save_plot_fullpath=root_directory+'generated.png', verbose=verbose)
 
+    if write_to_disk == True:
+        torch.save(VAE_model.state_dict(), root_directory+'pytorch_model_weights.pt')
 
 
 # =========================== VANILLA === LATENT SPACE VISUALIZATION =========================================
