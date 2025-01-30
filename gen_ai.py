@@ -1,3 +1,6 @@
+import time
+import os
+
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,23 +21,55 @@ from typing import List, Optional
 # ========================= PARAMETERS ==============================
 # The model to be used.  Possible values: 'AE' , 'VAE'
 model_type = 'VAE'
+layer_dimensions = [100, 200, 300, 256]
+latent_dimension = 2
 
 # If the model should only run the health checks and not train
 check_health = False
-verbose = False
-plot_progress = True
+verbose = True
+write_to_disk = False
+plot_progress = False
+plot_interval = 10
 
-epoches = 3
+epoches = 2
 learning_rate = 0.01
 
 #log_interval * batchsize = how often the intermediate result is displayed
-batch_size = 300
+batch_size = 400
 log_interval = 10
 
 test_batch_size = 1000
 
+
+
+# Activation Function ===  not implemented
+activation_func = 'relu'
 # LeakyReLU leak value
 leak = 0
+
+# Loss Function
+kl_loss_weight = 0.5
+l1_loss_weight = 0.2
+mse_loss_weight = 0.6
+
+if write_to_disk == True:
+    root_directory = '/home/student/Documents/IWR-CVL/3dcv-students/gen_ai-Models/Version-%d/'
+else:
+    root_directory = '/tmp/IWR-CVL-Trash-%d/'
+
+i=0
+while(1):
+    try:
+        os.mkdir(root_directory % i)
+        root_directory = str(root_directory % i)
+        print("Directory", root_directory, ' has been created.')
+        break
+    except FileExistsError:
+        print("ERROR: Directory", root_directory, ' already exists.', i)
+        i = i + 1
+
+
+
 # ========================= PARAMETERS ==============================
 
 # use GPU if available
@@ -65,17 +100,19 @@ print('Batch Size: ', batch_size)
 print('Learning Rate: ', learning_rate)
 print('ReLU Leak: ', leak)
 print('Verbose: ', verbose)
+print('Plot Progress: ', plot_progress)
+print('Plot Interval: ', plot_interval)
 print('Only Check Health: ', check_health)
 
 # ================== HELPER FUNCTIONS ==========================================
 #takes an array as the input and saves it at the specified path as a cvs file
-def arr2cvs_file(path: str, array, width: int, *label):  
+def arr2cvs_file(filename: str, array, width: int, *label):  
     '''
     Takes an 2D array as an input and saves it to a cvs file.
     The shape must be consistent. And the width specified.
     '''
     try:
-        with open(path, 'ax') as file:
+        with open(root_directory + filename, 'w') as file:
             heading = str(label[0])
             for i in range(width-1):
                 heading = heading + ',' + str(label[i+1])
@@ -86,15 +123,32 @@ def arr2cvs_file(path: str, array, width: int, *label):
                 entry = str(item[0])
 
                 for y in range(width-1):
-                    print(entry)
                     entry = entry + ',' + str(item[y+1])
-                print(entry)
+
                 file.write( entry + '\n' )
 
     except:
-        print("Error: Something went wrong")
+        print("Error: Something went wrong while saving to cvs")
     pass
 
+# ========================= INITIALIZATION ================================
+
+start_time = time.time()
+
+parameters = []
+parameters.append(['Model', model_type])
+parameters.append(['Epoches', epoches])
+parameters.append(['Batch Size', batch_size])
+parameters.append(['Test Batch Size', test_batch_size])
+parameters.append(['Learning Rate', learning_rate])
+parameters.append(['ReLU Leak', leak])
+parameters.append(['KL Loss Weight', kl_loss_weight])
+parameters.append(['L1 Loss Weight', l1_loss_weight])
+parameters.append(['MSE Loss Weight', mse_loss_weight])
+
+arr2cvs_file('parameters.cvs', parameters, 2, 'Parameter', 'Value')
+
+# ========================= INITIALIZATION ================================
 
 
 # ================== Vanilla Encoder Class =====================================
@@ -125,10 +179,10 @@ class Vanilla_AE(nn.Module):
         self.input_size = input_size
         self.latent_dim = latent_dim
         self.leak = leak
-
+    
         modules = []
         if hidden_dims is None:
-            self.hidden_dims = [32, 64, 128, 256]
+            return 0
         else: 
             self.hidden_dims = hidden_dims
 
@@ -137,26 +191,43 @@ class Vanilla_AE(nn.Module):
 
 
         # TODO: Save complete Encoder Sequential as self.encoder
-        layers = self.hidden_dims
+        #layers = self.hidden_dims
 
 
-        self.encoder = nn.Sequential(
-            nn.Conv2d(1, layers[0], 3, 2, 1),
-            nn.BatchNorm2d(layers[0]),
-            nn.LeakyReLU(self.leak),
+        #self.encoder = nn.Sequential(
+        #    nn.Conv2d(1, layers[0], 3, 2, 1),
+        #    nn.BatchNorm2d(layers[0]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.Conv2d(layers[0], layers[1], 3, 2, 1),
-            nn.BatchNorm2d(layers[1]),
-            nn.LeakyReLU(self.leak),
+        #    nn.Conv2d(layers[0], layers[1], 3, 2, 1),
+        #    nn.BatchNorm2d(layers[1]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.Conv2d(layers[1], layers[2], 3, 2, 1),
-            nn.BatchNorm2d(layers[2]),
-            nn.LeakyReLU(self.leak),
+        #    nn.Conv2d(layers[1], layers[2], 3, 2, 1),
+        #    nn.BatchNorm2d(layers[2]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.Conv2d(layers[2], layers[3], 3, 2, 1),
-            nn.BatchNorm2d(layers[3]),
-            nn.LeakyReLU(self.leak)
-        )
+        #    nn.Conv2d(layers[2], layers[3], 3, 2, 1),
+        #    nn.BatchNorm2d(layers[3]),
+        #    nn.LeakyReLU(self.leak)
+        #)
+        # Create List for the parameters
+        self.structure = []
+
+        #modify the hidden_dims to contain all needed layers including the input/output Layer
+        self.layer_struct = self.hidden_dims.copy()
+        self.layer_struct.insert(0, in_channels) # input_channels
+        #self.layer_struct.append(latent_dim) # Latent dimension
+
+        #create a loop that loops over all the layer info and appends it to the list
+        for i in range(len(self.layer_struct) - 1):
+            self.structure.append(nn.Conv2d(self.layer_struct[i], self.layer_struct[i+1], 3, 2, 1))
+            self.structure.append(nn.BatchNorm2d(self.layer_struct[i+1]))
+            self.structure.append(nn.LeakyReLU(self.leak))
+
+        #encode it all inside the nn.Sequential()
+        #print(self.structure)
+        self.encoder = nn.Sequential(*self.structure)
 
         # We basically calculate the image resolution here 
         # Since we use a fixed latent dim we need to calculate what the latent dim will be with our 
@@ -167,12 +238,14 @@ class Vanilla_AE(nn.Module):
         self.block_dimension = self.input_size 
         #print(self.block_dimension)
         for i in range(len(self.hidden_dims)): 
-            self.block_dimension = (self.block_dimension + 2 - 1) // 2
+            self.block_dimension = (self.block_dimension + 2 - 1 ) // 2 
 
         # This is used for the VAE later on 
         # For the AE we just use the fully_connecte mu predictor (fc_mu)
         #print(type(self.block_dimension))
         #print(self.block_dimension)
+        #print(self.block_dimension)
+        #print(self.hidden_dims[-1] * self.block_dimension[0] * self.block_dimension[1])
         self.fc_mu = nn.Linear(self.hidden_dims[-1] * self.block_dimension[0] * self.block_dimension[1], latent_dim)
         self.fc_var = nn.Linear(self.hidden_dims[-1] * self.block_dimension[0] * self.block_dimension[1], latent_dim)
 
@@ -185,35 +258,58 @@ class Vanilla_AE(nn.Module):
 
 
         # TODO: Save complete Decoder Sequential as self.Decoder
-        layers = self.hidden_dims
+        #layers = self.hidden_dims
         self.decoder_ff = nn.Sequential(
             nn.Linear(latent_dim, self.hidden_dims[-1] * self.block_dimension[0] * self.block_dimension[1]),
             nn.ReLU()
         )
 
-        self.decoder = nn.Sequential(
+        #self.decoder = nn.Sequential(
             
-            nn.ConvTranspose2d(layers[3], layers[2], 3, 2, 1, 1),
-            nn.BatchNorm2d(layers[2]),
-            nn.LeakyReLU(self.leak),
+        #    nn.ConvTranspose2d(layers[3], layers[2], 3, 2, 1, 1),
+        #    nn.BatchNorm2d(layers[2]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.ConvTranspose2d(layers[2], layers[1], 3, 2, 1, 1),
-            nn.BatchNorm2d(layers[1]),
-            nn.LeakyReLU(self.leak),
+        #    nn.ConvTranspose2d(layers[2], layers[1], 3, 2, 1, 1),
+        #    nn.BatchNorm2d(layers[1]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.ConvTranspose2d(layers[1], layers[0], 3, 2, 1, 1),
-            nn.BatchNorm2d(layers[0]),
-            nn.LeakyReLU(self.leak),
+        #    nn.ConvTranspose2d(layers[1], layers[0], 3, 2, 1, 1),
+        #    nn.BatchNorm2d(layers[0]),
+        #    nn.LeakyReLU(self.leak),
 
-            nn.ConvTranspose2d(layers[0], layers[0], 3, 2, 1, 1),
-            nn.BatchNorm2d(layers[0]),
-            nn.LeakyReLU(self.leak),
-        )
+        #    nn.ConvTranspose2d(layers[0], layers[0], 3, 2, 1, 1),
+        #    nn.BatchNorm2d(layers[0]),
+        #    nn.LeakyReLU(self.leak),
+        #)
+
+        self.structure = []
+        #print(hidden_dims)
+
+        #modify the hidden_dims to contain all needed layers including the input/output Layer
+        self.layer_struct = self.hidden_dims.copy()
+        #self.layer_struct.insert(0, in_channels) # input_channels
+        #self.layer_struct.append(latent_dim*latent_dim) # Latent dimension
+
+        self.layer_struct.reverse()
+        self.layer_struct.append(self.layer_struct[-1])
+        print(self.layer_struct)
+
+        #create a loop that loops over all the layer info and appends it to the list
+        for i in range(len(self.layer_struct) - 1):
+            self.structure.append(nn.ConvTranspose2d(self.layer_struct[i], self.layer_struct[i+1], 3, 2, 1, 1))
+            self.structure.append(nn.BatchNorm2d(self.layer_struct[i+1]))
+            self.structure.append(nn.LeakyReLU(self.leak))
+
+        #encode it all inside the nn.Sequential()
+        #print(self.structure)
+        self.decoder = nn.Sequential(*self.structure)
+
 
         # TODO: Set up Final Layer of Transposed Convolution and Resizing
         self.final_layer = nn.Sequential(
             TT.Resize(28),
-            nn.Conv2d(layers[0], 1, 1, 1, 0),
+            nn.Conv2d(self.layer_struct[-1], 1, 1, 1, 0),
             nn.Tanh()
         )
 
@@ -227,8 +323,11 @@ class Vanilla_AE(nn.Module):
         """
         # TODO: Implement the encoder forward
         # Use the self.fc_mu as well to predict the latent directly
+        #print(input.shape)
         encoding = self.encoder(input)
+        #print(encoding.shape)
         encoding = encoding.flatten(1)
+        #print(encoding.shape)
         latent_code = self.fc_mu(encoding)
 
         return latent_code
@@ -242,8 +341,10 @@ class Vanilla_AE(nn.Module):
         """
         # TODO: Implement the decoder forward
         
+        #print(z)
         z = self.decoder_ff(z)
-        z = torch.reshape(z, (-1, 256, 2, 2))
+
+        z = torch.reshape(z, (-1, self.hidden_dims[-1], 2, 2))
         decoding = self.decoder(z)
         reconstruction = self.final_layer(decoding)
 
@@ -277,8 +378,9 @@ class Vanilla_AE(nn.Module):
         return: Loss
         """
         # TODO: Implement the AE loss function
-        loss = nn.functional.mse_loss(prediction[0], target)
-        return loss
+        mse_loss = mse_loss_weight * nn.functional.mse_loss(prediction[0], target)
+        l1_loss = l1_loss_weight * nn.functional.l1_loss(prediction[0], target)
+        return mse_loss + l1_loss
 
 
 # ================== VARIATIONAL Encoder Class VAE =====================================
@@ -364,10 +466,11 @@ class VAE(Vanilla_AE):
         input = prediction[1].view(-1, 28*28)
         reconstruction = prediction[0].view(-1, 28*28)
 
-        kl_loss = 0.5 * torch.sum( mu * mu + sigma - log_sigma - 1) / num_batches 
-        mse_loss = 0.5 * torch.sum( torch.pow(input - reconstruction, 2), 1)
+        kl_loss = kl_loss_weight * torch.sum( mu * mu + sigma - log_sigma - 1) / num_batches 
+        mse_loss = mse_loss_weight * torch.sum( torch.pow(input - reconstruction, 2), 1)
+        l1_loss = l1_loss_weight * torch.sum( torch.abs(input - reconstruction), 1)
 
-        loss = kl_loss + mse_loss.mean()
+        loss = kl_loss + mse_loss.mean() + l1_loss.mean()
 
         return loss
 
@@ -386,7 +489,7 @@ class VAE(Vanilla_AE):
 # Test your implementation
 # You should see the original MNIST images and 2 noisy images below (since the AE is not trained yet)
 if model_type == 'AE':
-    AE_model = Vanilla_AE(in_channels=1, latent_dim=2, input_size=np.array([28, 28]), hidden_dims=[32, 64, 128, 256])
+    AE_model = Vanilla_AE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions)
 
 if model_type == 'AE' and check_health == True:
     summary(AE_model, input_size=(1, 28, 28), device='cpu')
@@ -416,7 +519,7 @@ if model_type == 'AE' and check_health == True:
 # Test your implementation
 # You should see the original MNIST images and 2 noisy images below (since the AE is not trained yet)
 if model_type == 'VAE':
-    VAE_model = VAE(in_channels=1, latent_dim=2, input_size=np.array([28, 28]), hidden_dims=[32, 64, 128, 256])
+    VAE_model = VAE(in_channels=1, latent_dim=latent_dimension, input_size=np.array([28, 28]), hidden_dims=layer_dimensions)
 
 if model_type == 'VAE' and check_health == True:
     summary(VAE_model, input_size=(1, 28, 28), device='cpu')
@@ -459,7 +562,7 @@ if model_type == 'AE' and check_health == False:
         AE_model = AE_model.cuda()
     for epoch in range(1, epochs + 1):
         # Validate 
-        if epoch % 3 == 0:
+        if epoch % plot_interval == 0:
             validate(model=AE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=plot_progress, verbose=verbose)
         else:
             validate(model=AE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=False, verbose=verbose)
@@ -475,7 +578,17 @@ if model_type == 'AE' and check_health == False:
 
         scheduler.step(test_loss[-1])
 
+    training_loss = []
+    if len(tr_loss) == len(test_loss):
+        for i, train_loss in enumerate(tr_loss):
+            training_loss.append([train_loss, test_loss[i]])
+
+    arr2cvs_file('loss.cvs', training_loss, 2, 'Training Loss', 'Test Loss')
+
+    
+
     plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_size)
+    validate(model=AE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=plot_progress, verbose=verbose)
 
 
 # ========================== VARIATIONAL Training ================================================================
@@ -495,7 +608,7 @@ if model_type == 'VAE' and check_health == False:
         VAE_model = VAE_model.cuda()
     for epoch in range(1, epochs + 1):
         # Validate 
-        if epoch % 5 == 0:
+        if epoch % plot_interval == 0:
             validate(model=VAE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=plot_progress, verbose=verbose)
         else:
             validate(model=VAE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=False, verbose=verbose)
@@ -514,12 +627,15 @@ if model_type == 'VAE' and check_health == False:
 
         scheduler.step(test_loss[-1])
 
-    #if len(tr_loss) == len(test_loss):
-    #    for i, train_loss in enumerate(tr_loss):
-    #        print(train_loss, test_loss[i])
-    #arr2cvs_file(path_data_loss, [])
+    training_loss = []
+    if len(tr_loss) == len(test_loss):
+        for i, train_loss in enumerate(tr_loss):
+            training_loss.append([train_loss, test_loss[i]])
+
+    arr2cvs_file('loss.cvs', training_loss, 2, 'Training Loss', 'Test Loss')
 
     plot_training(tr_loss_step, tr_loss, test_loss, epochs, train_loader, batch_size)
+    validate(model=VAE_model, use_cuda=use_cuda, test_loader=test_loader, test_loss=test_loss, plot=True, save_plot_fullpath=root_directory+'generated.png', verbose=verbose)
 
 
 
@@ -553,6 +669,7 @@ if model_type == 'AE' and check_health == False:
     plt.ylabel('Latent Dimension 2')
     plt.title('Latent Space Visualization')
     plt.grid(True)
+    plt.savefig(root_directory+'latent.png', format='png', dpi=420)
     plt.show()
 
 
@@ -586,10 +703,11 @@ if model_type == 'VAE' and check_health == False:
     plt.ylabel('Latent Dimension 2')
     plt.title('Latent Space Visualization')
     plt.grid(True)
+    plt.savefig(root_directory+'latent.png', format='png', dpi=420)
     plt.show()
 
 
 
 
-
-print(" END OF CODE! ")
+end_time = time.time()
+print(" --- END OF CODE! --- %s seconds ---" % (end_time - start_time))
