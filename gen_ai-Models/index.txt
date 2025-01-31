@@ -1,0 +1,36 @@
+=== The Table of Contents of the individual Experiments ===
+
+Version		Description
+0		Standart ReLU Activation Function, No L1 Loss, first long training 50 Epoches
+1		Same as 0, except unusually large training batchsize
+2		Unusually large training batchsize with the addition of the L1 Loss and different loss weights
+3		Same as 2, except KL-Divergence loss weight is set to 0
+4		Same as 2, except only the KL-Divergence loss is used, MSE and L1 set to 0
+5		Medium Batch size with similiar KL and MSE Loss weights and a small L1 Loss weight
+6		Same as 5, increased the MSE Loss and decreased KL Loss
+7		Exactly the same as 6, new feature: saving model weights as well
+8		Medium batch, new feature: Introduced New activation functions, Sigmoid in use
+9		Same as 8, but with ReLU
+10		New feature: Layers and Latent Dimension saved as well
+11		Reduced Batch size: 64 and large epoche number: 100
+12		Reduced batch, extended epoches, and L1 weight set to 0, KL and MSE equal weight
+13		Same as 12, except batchsize unusually large: 500
+14		Same as 12, except batchsize unusually small: 32
+15		Normal batchsize: 128, increased learning rate: 0.5
+16		Normal batchsize: 128, lessened learning rate: 0.01
+17		Normal batchsize: 128, absurd learning rate: 5
+18		Normal batchsize: 128, large latent dimension: 10
+19		Normal batchsize: 128, small latent dimension: 1
+20		divided Layerdimensions by 2 except for the last layer(256)
+21		multiplied Layerdimensions by 2 except for the last layer(256)
+22		Normal layerdimensions, experimenting with loss weights, set L1 and MSE to 0.5 and KL to 0.1
+23		Normal layerdimensions, experimenting with loss weights, set L1 and MSE to 0.5 and KL to 1
+24		Normal layerdimensions, experimenting with loss weights, set MSE and KL to 0.5 and L1 to 1
+25		Normal layerdimensions, experimenting with loss weights, set L1 and KL to 0.5 and MSE to 1
+26		Same as 25(25->produces bestlooking/accurate predictions), sigmoid activation function
+27		Same as 25(25->produces bestlooking/accurate predictions), tanh activation function
+28		Same as 25(25->produces bestlooking/accurate predictions), SiLU activation function
+29		LeakyReLU with unusually high leak value:10
+30		LeakyReLU with low leak value:0.1
+31		SAME AS 12: except normal batchsize -> DEFAULT SETTINGS (as in exercise)
+

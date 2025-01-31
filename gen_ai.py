@@ -33,13 +33,13 @@ write_to_disk = True
 
 # ================= SAVE TO DISK ================
 plot_progress = False
-plot_interval = 15
+plot_interval = 5
 
 epoches = 100
-learning_rate = 0.2
+learning_rate = 0.3
 
 #log_interval * batchsize = how often the intermediate result is displayed
-batch_size = 32
+batch_size = 128
 log_interval = 100
 
 test_batch_size = 1000
@@ -47,7 +47,7 @@ test_batch_size = 1000
 # Activation Function === possible values : 'leakyrelu', 'sigmoid', 'tanh', 'silu'
 activation_func = 'leakyrelu'
 # LeakyReLU leak value
-leak = 0
+leak = 0.0
 
 # Loss Function
 kl_loss_weight = 0.5
